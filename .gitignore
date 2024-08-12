@@ -1,0 +1,28 @@
+.env
+venv/
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Log files
+*.log
+
+# Editor-specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Database files
+*.sqlite3
+
+# pipenv
+Pipfile.lock
+
+# Poetry
+poetry.lock
+
+# Static and Media files
+/staticfiles/
+/media/
