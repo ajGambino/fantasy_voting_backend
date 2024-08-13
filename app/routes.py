@@ -19,8 +19,8 @@ def register():
 
 @app.route('/login', methods=['POST'])
 def login():
-    data = request.get_json()
-    user = User.query.filter_by(username=data['username']).first()
+    data = request.get_json() 
+    user = User.query.filter_by(username=data['username']).first() 
     if user and bcrypt.check_password_hash(user.password, data['password']):
         access_token = create_access_token(identity=user.id)
         return jsonify(access_token=access_token), 200
@@ -29,7 +29,7 @@ def login():
 @app.route('/questions', methods=['GET'])
 @jwt_required()
 def get_questions():
-    questions = Question.query.all()
+    questions = Question.query.order_by(Question.id).all()
     output = []
     for question in questions:
         options = Option.query.filter_by(question_id=question.id).all()
@@ -37,45 +37,63 @@ def get_questions():
         output.append({
             "id": question.id,
             "text": question.question_text,
+            "type": question.type, 
             "options": option_list
         })
-    return jsonify(output), 200
+    response = jsonify(output)
+    response.headers.add("Access-Control-Allow-Origin", "*")
+    response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
+    return response, 200
+
+
 
 @app.route('/vote', methods=['POST'])
 @jwt_required()
 def vote():
     data = request.get_json()
     user_id = get_jwt_identity()
+
+    yes_no_waiver_questions = ['Trade draft picks?', 'DST?', 'Kickers?', 'Re-seed playoffs?', 'Waivers']
+
     for vote_data in data['votes']:
-        vote = Vote.query.filter_by(user_id=user_id, option_id=vote_data['option_id']).first()
-        if vote:
-            vote.choice = vote_data['choice']
+        option = Option.query.filter_by(id=vote_data['option_id']).first()
+        question = Question.query.filter_by(id=option.question_id).first()
+        if question.question_text in yes_no_waiver_questions:
+           Vote.query.filter(Vote.user_id == user_id, Vote.option_id.in_(
+                [opt.id for opt in question.options]
+            )).delete(synchronize_session=False)
+
+       
+        existing_vote = Vote.query.filter_by(user_id=user_id, option_id=vote_data['option_id']).first()
+
+        if existing_vote:
+            existing_vote.choice = vote_data['choice']
         else:
-            vote = Vote(user_id=user_id, option_id=vote_data['option_id'], choice=vote_data['choice'])
-            db.session.add(vote)
+            new_vote = Vote(user_id=user_id, option_id=vote_data['option_id'], choice=vote_data['choice'])
+            db.session.add(new_vote)
+
     db.session.commit()
-    return jsonify({"message": "Votes recorded successfully"}), 200
+    response = jsonify({"message": "Votes recorded successfully"})
+    response.headers.add("Access-Control-Allow-Origin", "*")
+    return response, 200
 
-
-
-@app.route('/api/results', methods=['GET'])
+@app.route('/results', methods=['GET'])
 def get_results():
     results = []
+    questions = Question.query.order_by(Question.id).all()
 
-    questions = Question.query.all()
     for question in questions:
-        options = Option.query.filter_by(question_id=question.id).all()
+        options = Option.query.filter_by(question_id=question.id).order_by(Option.id).all()
         option_results = []
-        
+
         for option in options:
-            votes = db.session.query(
-                Vote.choice,
-                func.count(Vote.choice)
+            vote_counts = db.session.query(
+                Vote.choice, func.count(Vote.choice)
             ).filter_by(option_id=option.id).group_by(Vote.choice).all()
 
             option_results.append({
                 "option_text": option.option_text,
-                "votes": {vote[0]: vote[1] for vote in votes}
+                "votes": {vote[0]: vote[1] for vote in vote_counts}
             })
 
         results.append({

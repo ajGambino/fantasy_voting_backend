@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import os
 
 load_dotenv()  
-
+ 
 app = Flask(__name__)
 app.config.from_object('app.config.Config')
 
@@ -14,4 +14,4 @@ db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
 
-from app import routes  
+from . import routes  
