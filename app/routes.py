@@ -32,7 +32,8 @@ def get_questions():
     questions = Question.query.order_by(Question.id).all()
     output = []
     for question in questions:
-        options = Option.query.filter_by(question_id=question.id).all()
+        # Order options by id or another column that defines the correct order
+        options = Option.query.filter_by(question_id=question.id).order_by(Option.id).all()
         option_list = [{"id": option.id, "text": option.option_text} for option in options]
         output.append({
             "id": question.id,
@@ -44,6 +45,7 @@ def get_questions():
     response.headers.add("Access-Control-Allow-Origin", "*")
     response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
     return response, 200
+
 
 
 
