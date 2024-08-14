@@ -1,6 +1,6 @@
 from flask import request, jsonify
 from app import app, db, bcrypt
-from app.models import User, Question, Option, Vote
+from app.models import User, Question, Option, Vote, Availability
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from sqlalchemy import func
 
@@ -32,7 +32,6 @@ def get_questions():
     questions = Question.query.order_by(Question.id).all()
     output = []
     for question in questions:
-        # Order options by id or another column that defines the correct order
         options = Option.query.filter_by(question_id=question.id).order_by(Option.id).all()
         option_list = [{"id": option.id, "text": option.option_text} for option in options]
         output.append({
@@ -60,21 +59,17 @@ def vote():
         option = Option.query.filter_by(id=vote_data['option_id']).first()
         question = Question.query.filter_by(id=option.question_id).first()
 
-        # Delete previous votes for the current user on the same question
         if question.type in ['yes-no', 'waivers']:
             Vote.query.filter(
                 Vote.user_id == user_id,
                 Vote.option_id.in_([opt.id for opt in question.options])
             ).delete(synchronize_session=False)
 
-        # Check if the vote already exists
         existing_vote = Vote.query.filter_by(user_id=user_id, option_id=vote_data['option_id']).first()
 
         if existing_vote:
-            # Update the existing vote's choice
             existing_vote.choice = vote_data['choice']
         else:
-            # Create a new vote record if it doesn't exist
             new_vote = Vote(user_id=user_id, option_id=vote_data['option_id'], choice=vote_data['choice'])
             db.session.add(new_vote)
 
@@ -94,7 +89,6 @@ def get_results():
         option_results = []
 
         for option in options:
-            # Normalize the option text by removing the asterisk
             normalized_text = option.option_text.replace('*', '').strip().lower()
             
             vote_counts = db.session.query(
@@ -116,4 +110,19 @@ def get_results():
 
     return jsonify(results), 200
 
+@app.route('/availability', methods=['POST'])
+@jwt_required()
+def submit_availability():
+    data = request.get_json()
+    user_id = get_jwt_identity()
+    
+    
+    Availability.query.filter_by(user_id=user_id).delete()
+
+    for date, status in data['availability'].items():
+        new_availability = Availability(user_id=user_id, date=date, status=status)
+        db.session.add(new_availability)
+
+    db.session.commit()
+    return jsonify({"message": "Availability submitted successfully"}), 201
 

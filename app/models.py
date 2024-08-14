@@ -26,3 +26,11 @@ class Vote(db.Model):
     option_id = db.Column(db.Integer, db.ForeignKey('options.id'), nullable=False)  
     choice = db.Column(db.String(50), nullable=False)
  
+class Availability(db.Model):
+    __tablename__ = 'availability'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    status = db.Column(db.String(20), nullable=False)
+
+    user = db.relationship('User', backref=db.backref('availability', lazy=True))
