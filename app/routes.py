@@ -95,6 +95,7 @@ def get_results():
 
             option_results.append({
                 "option_text": option.option_text,
+                "type": question.type,
                 "votes": {vote[0]: vote[1] for vote in vote_counts}
             })
 
