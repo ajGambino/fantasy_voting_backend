@@ -48,7 +48,6 @@ def get_questions():
 
 
 
-
 @app.route('/vote', methods=['POST'])
 @jwt_required()
 def vote():
@@ -60,17 +59,22 @@ def vote():
     for vote_data in data['votes']:
         option = Option.query.filter_by(id=vote_data['option_id']).first()
         question = Question.query.filter_by(id=option.question_id).first()
-        if question.question_text in yes_no_waiver_questions:
-           Vote.query.filter(Vote.user_id == user_id, Vote.option_id.in_(
-                [opt.id for opt in question.options]
-            )).delete(synchronize_session=False)
 
-       
+        # Delete previous votes for the current user on the same question
+        if question.type in ['yes-no', 'waivers']:
+            Vote.query.filter(
+                Vote.user_id == user_id,
+                Vote.option_id.in_([opt.id for opt in question.options])
+            ).delete(synchronize_session=False)
+
+        # Check if the vote already exists
         existing_vote = Vote.query.filter_by(user_id=user_id, option_id=vote_data['option_id']).first()
 
         if existing_vote:
+            # Update the existing vote's choice
             existing_vote.choice = vote_data['choice']
         else:
+            # Create a new vote record if it doesn't exist
             new_vote = Vote(user_id=user_id, option_id=vote_data['option_id'], choice=vote_data['choice'])
             db.session.add(new_vote)
 
@@ -78,6 +82,7 @@ def vote():
     response = jsonify({"message": "Votes recorded successfully"})
     response.headers.add("Access-Control-Allow-Origin", "*")
     return response, 200
+
 
 @app.route('/results', methods=['GET'])
 def get_results():
@@ -89,9 +94,14 @@ def get_results():
         option_results = []
 
         for option in options:
+            # Normalize the option text by removing the asterisk
+            normalized_text = option.option_text.replace('*', '').strip().lower()
+            
             vote_counts = db.session.query(
                 Vote.choice, func.count(Vote.choice)
-            ).filter_by(option_id=option.id).group_by(Vote.choice).all()
+            ).filter(
+                Vote.option_id == option.id
+            ).group_by(Vote.choice).all()
 
             option_results.append({
                 "option_text": option.option_text,
@@ -105,3 +115,5 @@ def get_results():
         })
 
     return jsonify(results), 200
+
+
