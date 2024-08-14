@@ -3,6 +3,8 @@ from app import app, db, bcrypt
 from app.models import User, Question, Option, Vote, Availability
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from sqlalchemy import func
+from datetime import datetime
+
 
 @app.route('/')
 def home():
@@ -113,16 +115,32 @@ def get_results():
 @app.route('/availability', methods=['POST'])
 @jwt_required()
 def submit_availability():
-    data = request.get_json()
-    user_id = get_jwt_identity()
-    
-    
-    Availability.query.filter_by(user_id=user_id).delete()
+    try:
+        data = request.get_json()
+        user_id = get_jwt_identity()
 
-    for date, status in data['availability'].items():
-        new_availability = Availability(user_id=user_id, date=date, status=status)
-        db.session.add(new_availability)
+        # Convert the date strings to the correct format
+        converted_data = {}
+        for date, status in data['availability'].items():
+            # Convert 'August 25' to '2024-08-25'
+            try:
+                # Assume the year is 2024 (you can make this dynamic if needed)
+                converted_date = datetime.strptime(f"2024 {date}", "%Y %B %d").date()
+                converted_data[converted_date] = status
+            except ValueError as e:
+                return jsonify({"error": f"Invalid date format: {date}"}), 400
 
-    db.session.commit()
-    return jsonify({"message": "Availability submitted successfully"}), 201
+        Availability.query.filter_by(user_id=user_id).delete()
+
+        for date, status in converted_data.items():
+            new_availability = Availability(user_id=user_id, date=date, status=status)
+            db.session.add(new_availability)
+
+        db.session.commit()
+        return jsonify({"message": "Availability submitted successfully"}), 201
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 

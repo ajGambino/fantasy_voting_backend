@@ -3,7 +3,7 @@ from flask_cors import CORS
 from app import app
 
 
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
 
 
 if __name__ == '__main__':
