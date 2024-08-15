@@ -2,7 +2,7 @@ from flask import request, jsonify
 from app import app, db, bcrypt
 from app.models import User, Question, Option, Vote, Availability
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
-from sqlalchemy import func
+from sqlalchemy import func, case
 from datetime import datetime
 
 
@@ -142,5 +142,26 @@ def submit_availability():
         print(f"Error: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/availability-summary', methods=['GET'])
+@jwt_required()
+def get_availability_summary():
+    user_id = get_jwt_identity()
+    
+    summary = db.session.query(
+        Availability.date,
+        func.sum(case((Availability.status == 'available', 1), else_=0)).label('available'),
+        func.sum(case((Availability.status == 'maybe', 1), else_=0)).label('maybe'),
+        func.sum(case((Availability.status == 'unavailable', 1), else_=0)).label('unavailable')
+    ).group_by(Availability.date).all()
 
+    summary_data = [
+        {
+            "date": item.date.strftime("%B %d"),
+            "available": item.available,
+            "maybe": item.maybe,
+            "unavailable": item.unavailable
+        }
+        for item in summary
+    ]
 
+    return jsonify(summary_data), 200
